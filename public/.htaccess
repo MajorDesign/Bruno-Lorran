@@ -1,0 +1,10 @@
+# SPA fallback — redireciona todas as rotas para index.html (React Router).
+# Vale para deploy na raiz do Hostinger (public_html). Em subpasta, ajuste o RewriteBase.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
