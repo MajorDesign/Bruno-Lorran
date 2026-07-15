@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppLayout } from './components/AppLayout'
 import { LoginPage } from './pages/LoginPage'
+import { DashboardPage } from './pages/DashboardPage'
+import { ModulesPage } from './pages/ModulesPage'
 import { StudentsPage } from './pages/StudentsPage'
 import { StudentDetailPage } from './pages/StudentDetailPage'
 import { VideosPage } from './pages/VideosPage'
@@ -18,13 +20,15 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/alunos" replace />} />
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/alunos" element={<StudentsPage />} />
         <Route path="/alunos/:id" element={<StudentDetailPage />} />
+        <Route path="/modulos" element={<ModulesPage />} />
         <Route path="/videos" element={<VideosPage />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/alunos" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   )
 }

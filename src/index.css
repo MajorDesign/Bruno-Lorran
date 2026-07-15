@@ -10,16 +10,19 @@
   --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 
-  --color-paper: #f6f4ef;
+  --color-paper: #f4f6fb;
   --color-surface: #ffffff;
-  --color-ink: #16182b;
-  --color-ink-soft: #565973;
-  --color-ink-faint: #8a8ca3;
-  --color-line: #e7e3da;
+  --color-ink: #0b1220;
+  --color-ink-soft: #475569;
+  --color-ink-faint: #94a3b8;
+  --color-line: #e6e9f2;
 
-  --color-accent: #e8583c;
-  --color-accent-hover: #d2472d;
-  --color-accent-soft: #fbe7e1;
+  --color-accent: #1d4ed8;
+  --color-accent-hover: #1a44bd;
+  --color-accent-soft: #e7edfd;
+
+  --color-red: #e11d48;
+  --color-red-soft: #fde7ec;
 
   --color-solicitado: #b0741a;
   --color-solicitado-bg: #fbf0da;

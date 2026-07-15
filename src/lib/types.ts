@@ -34,7 +34,37 @@ export interface Video {
   titulo: string
   nivel: string | null
   ordem: number
+  module_id: string | null
   created_at: string
+}
+
+export interface Module {
+  id: string
+  nome: string
+  nivel: string | null
+  ordem: number
+  created_at: string
+}
+
+export interface ModuleStatus {
+  id: string
+  nome: string
+  cor: string
+  ordem: number
+  created_at: string
+}
+
+export interface StudentModule {
+  id: string
+  student_id: string
+  module_id: string
+  status_id: string | null
+  updated_at: string
+}
+
+// Vínculo aluno×módulo combinado com dados do módulo (tela do aluno)
+export interface StudentModuleWithModule extends StudentModule {
+  module: Module
 }
 
 export interface StudentVideo {

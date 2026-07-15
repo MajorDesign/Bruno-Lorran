@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { Student, StatusVideo, StudentVideoWithVideo, Video } from '../lib/types'
+import type {
+  Module,
+  ModuleStatus,
+  Student,
+  StatusVideo,
+  StudentModuleWithModule,
+  StudentVideoWithVideo,
+  Video,
+} from '../lib/types'
 import { Button, Card, EmptyState, LevelPill, Spinner, StatusBadge } from '../components/ui'
 
 export function StudentDetailPage() {
@@ -9,22 +17,27 @@ export function StudentDetailPage() {
   const [student, setStudent] = useState<Student | null>(null)
   const [assigned, setAssigned] = useState<StudentVideoWithVideo[]>([])
   const [allVideos, setAllVideos] = useState<Video[]>([])
+  const [assignedModules, setAssignedModules] = useState<StudentModuleWithModule[]>([])
+  const [allModules, setAllModules] = useState<Module[]>([])
+  const [statuses, setStatuses] = useState<ModuleStatus[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showPicker, setShowPicker] = useState(false)
+  const [showModulePicker, setShowModulePicker] = useState(false)
   const [onlyLevel, setOnlyLevel] = useState(true)
 
   const load = useCallback(async () => {
     if (!id) return
     setLoading(true)
-    const [studentRes, assignedRes, videosRes] = await Promise.all([
-      supabase.from('students').select('*').eq('id', id).single(),
-      supabase
-        .from('student_videos')
-        .select('*, video:videos(*)')
-        .eq('student_id', id),
-      supabase.from('videos').select('*').order('nivel').order('ordem'),
-    ])
+    const [studentRes, assignedRes, videosRes, modLinkRes, modulesRes, statusRes] =
+      await Promise.all([
+        supabase.from('students').select('*').eq('id', id).single(),
+        supabase.from('student_videos').select('*, video:videos(*)').eq('student_id', id),
+        supabase.from('videos').select('*').order('nivel').order('ordem'),
+        supabase.from('student_modules').select('*, module:modules(*)').eq('student_id', id),
+        supabase.from('modules').select('*').order('nivel').order('ordem'),
+        supabase.from('module_statuses').select('*').order('ordem'),
+      ])
 
     if (studentRes.error) setError(studentRes.error.message)
     else setStudent(studentRes.data as Student)
@@ -34,6 +47,15 @@ export function StudentDetailPage() {
 
     if (videosRes.error) setError(videosRes.error.message)
     else setAllVideos((videosRes.data as Video[]) ?? [])
+
+    if (modLinkRes.error) setError(modLinkRes.error.message)
+    else setAssignedModules((modLinkRes.data as StudentModuleWithModule[]) ?? [])
+
+    if (modulesRes.error) setError(modulesRes.error.message)
+    else setAllModules((modulesRes.data as Module[]) ?? [])
+
+    if (statusRes.error) setError(statusRes.error.message)
+    else setStatuses((statusRes.data as ModuleStatus[]) ?? [])
 
     setLoading(false)
   }, [id])
@@ -103,6 +125,56 @@ export function StudentDetailPage() {
     }
   }
 
+  // ---------- Módulos ----------
+  const assignedModuleIds = useMemo(
+    () => new Set(assignedModules.map((a) => a.module_id)),
+    [assignedModules],
+  )
+  const availableModules = useMemo(
+    () => allModules.filter((m) => !assignedModuleIds.has(m.id)),
+    [allModules, assignedModuleIds],
+  )
+
+  async function assignModule(module: Module) {
+    if (!id) return
+    const firstStatus = statuses[0]?.id ?? null
+    const { data, error } = await supabase
+      .from('student_modules')
+      .insert({ student_id: id, module_id: module.id, status_id: firstStatus })
+      .select('*, module:modules(*)')
+      .single()
+    if (error) {
+      setError(error.message)
+      return
+    }
+    setAssignedModules((prev) => [...prev, data as StudentModuleWithModule])
+  }
+
+  async function changeModuleStatus(link: StudentModuleWithModule, statusId: string | null) {
+    const prev = assignedModules
+    setAssignedModules((cur) =>
+      cur.map((a) => (a.id === link.id ? { ...a, status_id: statusId } : a)),
+    )
+    const { error } = await supabase
+      .from('student_modules')
+      .update({ status_id: statusId })
+      .eq('id', link.id)
+    if (error) {
+      setError(error.message)
+      setAssignedModules(prev)
+    }
+  }
+
+  async function removeModule(link: StudentModuleWithModule) {
+    const prev = assignedModules
+    setAssignedModules((cur) => cur.filter((a) => a.id !== link.id))
+    const { error } = await supabase.from('student_modules').delete().eq('id', link.id)
+    if (error) {
+      setError(error.message)
+      setAssignedModules(prev)
+    }
+  }
+
   if (loading) return <Spinner />
   if (!student)
     return (
@@ -131,7 +203,8 @@ export function StudentDetailPage() {
           </div>
         </div>
         <div className="text-right text-sm text-ink-soft">
-          <span className="font-semibold text-ink">{assigned.length}</span> vídeo(s) vinculado(s) ·{' '}
+          <span className="font-semibold text-ink">{assignedModules.length}</span> módulo(s) ·{' '}
+          <span className="font-semibold text-ink">{assigned.length}</span> vídeo(s) ·{' '}
           <span className="font-semibold text-assistido">
             {assigned.filter((a) => a.status === 'assistido').length}
           </span>{' '}
@@ -144,6 +217,90 @@ export function StudentDetailPage() {
           {error}
         </p>
       )}
+
+      {/* Módulos vinculados */}
+      <section className="mb-8">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-display text-lg font-semibold text-ink">Módulos do aluno</h2>
+          <Button
+            onClick={() => setShowModulePicker((v) => !v)}
+            variant={showModulePicker ? 'ghost' : 'primary'}
+          >
+            {showModulePicker ? 'Fechar' : '+ Vincular módulos'}
+          </Button>
+        </div>
+
+        {assignedModules.length === 0 ? (
+          <EmptyState
+            title="Nenhum módulo vinculado"
+            description="Clique em “Vincular módulos” para atribuir módulos a este aluno e definir o status."
+          />
+        ) : (
+          <Card className="divide-y divide-line/70">
+            {assignedModules.map((link) => (
+              <div key={link.id} className="flex flex-wrap items-center gap-4 px-5 py-3.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-ink">{link.module.nome}</p>
+                  <div className="mt-1">
+                    <LevelPill nivel={link.module.nivel} />
+                  </div>
+                </div>
+
+                <ModuleStatusSelect
+                  statuses={statuses}
+                  value={link.status_id}
+                  onChange={(sid) => changeModuleStatus(link, sid)}
+                />
+
+                <button
+                  onClick={() => removeModule(link)}
+                  className="text-xs font-medium text-ink-faint hover:text-red"
+                  title="Desvincular módulo"
+                >
+                  Remover
+                </button>
+              </div>
+            ))}
+          </Card>
+        )}
+
+        {showModulePicker && (
+          <div className="mt-3">
+            <h3 className="mb-2 text-sm font-semibold text-ink-soft">Adicionar módulos</h3>
+            {availableModules.length === 0 ? (
+              <EmptyState
+                title="Nada para adicionar"
+                description={
+                  allModules.length === 0
+                    ? 'Cadastre módulos na aba Módulos primeiro.'
+                    : 'Todos os módulos já estão vinculados a este aluno.'
+                }
+              />
+            ) : (
+              <Card className="divide-y divide-line/70">
+                {availableModules.map((m) => (
+                  <div key={m.id} className="flex items-center gap-4 px-5 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-ink">{m.nome}</p>
+                      <div className="mt-1">
+                        <LevelPill nivel={m.nivel} />
+                      </div>
+                    </div>
+                    <Button variant="ghost" onClick={() => assignModule(m)}>
+                      + Adicionar
+                    </Button>
+                  </div>
+                ))}
+              </Card>
+            )}
+            {statuses.length === 0 && (
+              <p className="mt-2 text-xs text-ink-faint">
+                Dica: cadastre status na aba <strong>Módulos</strong> para marcá-los aqui.
+              </p>
+            )}
+          </div>
+        )}
+      </section>
 
       {/* Vídeos vinculados */}
       <section className="mb-8">
@@ -264,6 +421,40 @@ function StatusToggle({
           Assistido
         </button>
       </div>
+    </div>
+  )
+}
+
+// Dropdown do status personalizado (módulos)
+function ModuleStatusSelect({
+  statuses,
+  value,
+  onChange,
+}: {
+  statuses: ModuleStatus[]
+  value: string | null
+  onChange: (statusId: string | null) => void
+}) {
+  const current = statuses.find((s) => s.id === value)
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className="hidden h-2.5 w-2.5 shrink-0 rounded-full sm:block"
+        style={{ backgroundColor: current?.cor ?? '#cbd5e1' }}
+      />
+      <select
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value || null)}
+        className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold focus:border-accent focus:outline-none"
+        style={current ? { color: current.cor } : { color: 'var(--color-ink-faint)' }}
+      >
+        <option value="">— sem status —</option>
+        {statuses.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.nome}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }

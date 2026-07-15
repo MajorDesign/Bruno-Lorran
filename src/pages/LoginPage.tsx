@@ -13,7 +13,7 @@ export function LoginPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/alunos'
+  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/dashboard'
 
   if (!loading && session) return <Navigate to={from} replace />
 
@@ -28,6 +28,8 @@ export function LoginPage() {
       setError(error)
       return
     }
+    // Sinaliza para exibir o preloader de boas-vindas uma vez após o login.
+    sessionStorage.setItem('bl_welcome', '1')
     navigate(from, { replace: true })
   }
 
