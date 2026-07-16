@@ -1,12 +1,19 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { WelcomeSplash } from './WelcomeSplash'
 
-// Shell autenticado no estilo do exemplo: topbar escura + sidebar com ícones.
+// Shell autenticado: topbar + sidebar retrátil em navy escuro; conteúdo claro.
 export function AppLayout() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const [collapsed, setCollapsed] = useState(
+    () => typeof localStorage !== 'undefined' && localStorage.getItem('bl_sidebar') === 'collapsed',
+  )
+
+  useEffect(() => {
+    localStorage.setItem('bl_sidebar', collapsed ? 'collapsed' : 'expanded')
+  }, [collapsed])
 
   async function handleSignOut() {
     await signOut()
@@ -20,18 +27,26 @@ export function AppLayout() {
       <WelcomeSplash />
 
       {/* ---------- Topbar ---------- */}
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between bg-ink px-4 text-white sm:px-6">
-        <div className="flex items-center gap-2.5">
-          <span className="h-6 w-1.5 rounded-full bg-gradient-to-b from-[#1d4ed8] to-[#e11d48]" />
-          <p className="font-display text-lg font-semibold leading-none">Bruno Lorran</p>
-          <span className="ml-1 hidden text-[11px] font-medium uppercase tracking-widest text-white/40 sm:inline">
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between bg-navy px-3 text-white sm:px-5">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setCollapsed((v) => !v)}
+            className="rounded-lg p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            title={collapsed ? 'Expandir menu' : 'Recolher menu'}
+            aria-label="Alternar menu"
+          >
+            <MenuIcon />
+          </button>
+          <span className="h-6 w-1.5 rounded-full bg-gradient-to-b from-[#4f7cff] to-[#f43f6e]" />
+          <p className="font-display text-lg font-semibold leading-none tracking-tight">Bruno Lorran</p>
+          <span className="ml-1 hidden text-[11px] font-semibold uppercase tracking-widest text-white/40 sm:inline">
             Plataforma de Inglês
           </span>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="hidden items-center gap-2.5 sm:flex">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#1d4ed8] to-[#e11d48] text-sm font-bold text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#4f7cff] to-[#f43f6e] text-sm font-bold text-white">
               {initial}
             </span>
             <div className="leading-tight">
@@ -53,13 +68,14 @@ export function AppLayout() {
       </header>
 
       <div className="flex flex-1">
-        {/* ---------- Sidebar ---------- */}
-        <aside className="w-16 shrink-0 border-r border-line bg-surface px-2 py-4 sm:w-56 sm:px-3">
+        {/* ---------- Sidebar retrátil ---------- */}
+        <aside
+          className={`${collapsed ? 'w-[68px]' : 'w-60'} shrink-0 bg-navy px-2.5 py-4 transition-[width] duration-200 sm:px-3`}
+        >
           <nav className="space-y-1">
-            <NavItem to="/dashboard" icon={<GaugeIcon />} label="Dashboard" />
-            <NavItem to="/alunos" icon={<UsersIcon />} label="Alunos" />
-            <NavItem to="/modulos" icon={<ModulesIcon />} label="Módulos" />
-            <NavItem to="/videos" icon={<VideoIcon />} label="Vídeos" />
+            <NavItem to="/dashboard" icon={<GaugeIcon />} label="Dashboard" collapsed={collapsed} />
+            <NavItem to="/alunos" icon={<UsersIcon />} label="Alunos" collapsed={collapsed} />
+            <NavItem to="/modulos" icon={<ModulesIcon />} label="Módulos" collapsed={collapsed} />
           </nav>
         </aside>
 
@@ -74,24 +90,34 @@ export function AppLayout() {
   )
 }
 
-function NavItem({ to, icon, label }: { to: string; icon: ReactNode; label: string }) {
+function NavItem({
+  to,
+  icon,
+  label,
+  collapsed,
+}: {
+  to: string
+  icon: ReactNode
+  label: string
+  collapsed: boolean
+}) {
   return (
     <NavLink
       to={to}
       title={label}
       className={({ isActive }) =>
-        `relative flex items-center justify-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors sm:justify-start ${
-          isActive ? 'bg-accent-soft text-accent' : 'text-ink-soft hover:bg-paper'
-        }`
+        `relative flex items-center gap-3 rounded-lg py-2.5 text-sm font-semibold transition-colors ${
+          collapsed ? 'justify-center px-0' : 'px-3'
+        } ${isActive ? 'bg-white/12 text-white' : 'text-white/55 hover:bg-white/8 hover:text-white'}`
       }
     >
       {({ isActive }) => (
         <>
           {isActive && (
-            <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-accent" />
+            <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-gradient-to-b from-[#4f7cff] to-[#f43f6e]" />
           )}
-          <span className={isActive ? 'text-accent' : 'text-ink-faint'}>{icon}</span>
-          <span className="hidden sm:inline">{label}</span>
+          <span className={isActive ? 'text-[#7aa2ff]' : ''}>{icon}</span>
+          {!collapsed && <span>{label}</span>}
         </>
       )}
     </NavLink>
@@ -99,6 +125,15 @@ function NavItem({ to, icon, label }: { to: string; icon: ReactNode; label: stri
 }
 
 /* ---------- Ícones ---------- */
+function MenuIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  )
+}
 function GaugeIcon() {
   return (
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -114,14 +149,6 @@ function UsersIcon() {
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  )
-}
-function VideoIcon() {
-  return (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="23 7 16 12 23 17 23 7" />
-      <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
     </svg>
   )
 }

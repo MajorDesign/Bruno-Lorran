@@ -54,6 +54,22 @@ export interface ModuleStatus {
   created_at: string
 }
 
+export interface Lesson {
+  id: string
+  module_id: string
+  nome: string
+  ordem: number
+  created_at: string
+}
+
+export interface StudentLesson {
+  id: string
+  student_id: string
+  lesson_id: string
+  status: StatusVideo // 'solicitado' | 'assistido'
+  updated_at: string
+}
+
 export interface StudentModule {
   id: string
   student_id: string

@@ -120,3 +120,103 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
     </div>
   )
 }
+
+/* ============================================================
+   Botões de ação padronizados (ícone + rótulo, cores do sistema).
+   Use `size="sm"` para linhas de tabela.
+   ============================================================ */
+type ActionBtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { label?: string; size?: 'sm' | 'md' }
+
+function actionCls(size: 'sm' | 'md') {
+  const pad = size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3.5 py-2 text-sm'
+  return `inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${pad}`
+}
+
+export function BtnNovo({ label = 'Novo', size = 'md', className = '', children, ...p }: ActionBtnProps) {
+  return (
+    <button className={`${actionCls(size)} bg-accent text-white hover:bg-accent-hover ${className}`} {...p}>
+      <IconPlus /> {children ?? label}
+    </button>
+  )
+}
+
+export function BtnSalvar({ label = 'Salvar', size = 'md', className = '', children, ...p }: ActionBtnProps) {
+  return (
+    <button className={`${actionCls(size)} bg-assistido text-white hover:brightness-110 ${className}`} {...p}>
+      <IconSave /> {children ?? label}
+    </button>
+  )
+}
+
+export function BtnAlterar({ label = 'Alterar', size = 'md', className = '', children, ...p }: ActionBtnProps) {
+  return (
+    <button
+      type="button"
+      className={`${actionCls(size)} border border-line bg-surface text-ink hover:bg-paper ${className}`}
+      {...p}
+    >
+      <span className="text-accent">
+        <IconEdit />
+      </span>{' '}
+      {children ?? label}
+    </button>
+  )
+}
+
+export function BtnExcluir({ label = 'Excluir', size = 'md', className = '', children, ...p }: ActionBtnProps) {
+  return (
+    <button
+      type="button"
+      className={`${actionCls(size)} border border-red/30 bg-red-soft text-red hover:bg-red hover:text-white ${className}`}
+      {...p}
+    >
+      <IconTrash /> {children ?? label}
+    </button>
+  )
+}
+
+export function BtnCancelar({ label = 'Cancelar', size = 'md', className = '', children, ...p }: ActionBtnProps) {
+  return (
+    <button type="button" className={`${actionCls(size)} text-ink-soft hover:bg-paper ${className}`} {...p}>
+      <IconX /> {children ?? label}
+    </button>
+  )
+}
+
+/* Ícones dos botões */
+function IconPlus() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
+function IconSave() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+      <path d="M17 21v-8H7v8M7 3v5h8" />
+    </svg>
+  )
+}
+function IconEdit() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  )
+}
+function IconTrash() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
+    </svg>
+  )
+}
+function IconX() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  )
+}

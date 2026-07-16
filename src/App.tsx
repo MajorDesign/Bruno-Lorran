@@ -6,7 +6,6 @@ import { DashboardPage } from './pages/DashboardPage'
 import { ModulesPage } from './pages/ModulesPage'
 import { StudentsPage } from './pages/StudentsPage'
 import { StudentDetailPage } from './pages/StudentDetailPage'
-import { VideosPage } from './pages/VideosPage'
 
 export default function App() {
   return (
@@ -25,7 +24,6 @@ export default function App() {
         <Route path="/alunos" element={<StudentsPage />} />
         <Route path="/alunos/:id" element={<StudentDetailPage />} />
         <Route path="/modulos" element={<ModulesPage />} />
-        <Route path="/videos" element={<VideosPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

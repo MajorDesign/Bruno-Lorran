@@ -1,62 +1,55 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type {
-  Module,
-  ModuleStatus,
-  Student,
-  StatusVideo,
-  StudentModuleWithModule,
-  StudentVideoWithVideo,
-  Video,
-} from '../lib/types'
-import { Button, Card, EmptyState, LevelPill, Spinner, StatusBadge } from '../components/ui'
+import type { Lesson, Module, Student, StatusVideo } from '../lib/types'
+import { BtnCancelar, BtnSalvar, Button, Card, EmptyState, LevelPill, Spinner } from '../components/ui'
+
+interface LessonStatusEntry {
+  id: string
+  status: StatusVideo
+}
 
 export function StudentDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [student, setStudent] = useState<Student | null>(null)
-  const [assigned, setAssigned] = useState<StudentVideoWithVideo[]>([])
-  const [allVideos, setAllVideos] = useState<Video[]>([])
-  const [assignedModules, setAssignedModules] = useState<StudentModuleWithModule[]>([])
-  const [allModules, setAllModules] = useState<Module[]>([])
-  const [statuses, setStatuses] = useState<ModuleStatus[]>([])
+  const [modules, setModules] = useState<Module[]>([])
+  const [lessonsByModule, setLessonsByModule] = useState<Record<string, Lesson[]>>({})
+  const [lessonStatus, setLessonStatus] = useState<Record<string, LessonStatusEntry>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showPicker, setShowPicker] = useState(false)
-  const [showModulePicker, setShowModulePicker] = useState(false)
   const [onlyLevel, setOnlyLevel] = useState(true)
+
+  // Alterações pendentes (só vão pro banco ao clicar em Salvar)
+  const [pending, setPending] = useState<Record<string, '' | StatusVideo>>({})
+  const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
     setLoading(true)
-    const [studentRes, assignedRes, videosRes, modLinkRes, modulesRes, statusRes] =
-      await Promise.all([
-        supabase.from('students').select('*').eq('id', id).single(),
-        supabase.from('student_videos').select('*, video:videos(*)').eq('student_id', id),
-        supabase.from('videos').select('*').order('nivel').order('ordem'),
-        supabase.from('student_modules').select('*, module:modules(*)').eq('student_id', id),
-        supabase.from('modules').select('*').order('nivel').order('ordem'),
-        supabase.from('module_statuses').select('*').order('ordem'),
-      ])
+    const [studentRes, modulesRes, lessonsRes, slRes] = await Promise.all([
+      supabase.from('students').select('*').eq('id', id).single(),
+      supabase.from('modules').select('*').order('nivel').order('ordem'),
+      supabase.from('lessons').select('*').order('ordem'),
+      supabase.from('student_lessons').select('id, lesson_id, status').eq('student_id', id),
+    ])
 
     if (studentRes.error) setError(studentRes.error.message)
     else setStudent(studentRes.data as Student)
-
-    if (assignedRes.error) setError(assignedRes.error.message)
-    else setAssigned((assignedRes.data as StudentVideoWithVideo[]) ?? [])
-
-    if (videosRes.error) setError(videosRes.error.message)
-    else setAllVideos((videosRes.data as Video[]) ?? [])
-
-    if (modLinkRes.error) setError(modLinkRes.error.message)
-    else setAssignedModules((modLinkRes.data as StudentModuleWithModule[]) ?? [])
-
     if (modulesRes.error) setError(modulesRes.error.message)
-    else setAllModules((modulesRes.data as Module[]) ?? [])
-
-    if (statusRes.error) setError(statusRes.error.message)
-    else setStatuses((statusRes.data as ModuleStatus[]) ?? [])
-
+    else setModules((modulesRes.data as Module[]) ?? [])
+    if (lessonsRes.error) setError(lessonsRes.error.message)
+    else {
+      const grouped: Record<string, Lesson[]> = {}
+      for (const l of (lessonsRes.data as Lesson[]) ?? []) (grouped[l.module_id] ??= []).push(l)
+      setLessonsByModule(grouped)
+    }
+    if (slRes.error) setError(slRes.error.message)
+    else {
+      const map: Record<string, LessonStatusEntry> = {}
+      for (const r of (slRes.data as { id: string; lesson_id: string; status: StatusVideo }[]) ?? [])
+        map[r.lesson_id] = { id: r.id, status: r.status }
+      setLessonStatus(map)
+    }
     setLoading(false)
   }, [id])
 
@@ -64,115 +57,71 @@ export function StudentDetailPage() {
     load()
   }, [load])
 
-  // Ordena os vídeos vinculados por nível e ordem do vídeo
-  const assignedSorted = useMemo(
+  const modulesWithLessons = useMemo(
     () =>
-      [...assigned].sort(
-        (a, b) =>
-          (a.video.nivel ?? '').localeCompare(b.video.nivel ?? '') ||
-          a.video.ordem - b.video.ordem,
+      modules.filter(
+        (m) =>
+          (lessonsByModule[m.id]?.length ?? 0) > 0 &&
+          (!onlyLevel || !student?.nivel || m.nivel === student.nivel),
       ),
-    [assigned],
+    [modules, lessonsByModule, onlyLevel, student],
   )
 
-  const assignedIds = useMemo(() => new Set(assigned.map((a) => a.video_id)), [assigned])
+  function lessonValue(lessonId: string): '' | StatusVideo {
+    return lessonId in pending ? pending[lessonId] : lessonStatus[lessonId]?.status ?? ''
+  }
 
-  // Vídeos ainda não vinculados (opcionalmente filtrados pelo nível do aluno)
-  const available = useMemo(
-    () =>
-      allVideos.filter(
-        (v) =>
-          !assignedIds.has(v.id) &&
-          (!onlyLevel || !student?.nivel || v.nivel === student.nivel),
-      ),
-    [allVideos, assignedIds, onlyLevel, student],
-  )
+  const dirtyCount = useMemo(() => {
+    let n = 0
+    for (const [lid, v] of Object.entries(pending)) if (v !== (lessonStatus[lid]?.status ?? '')) n++
+    return n
+  }, [pending, lessonStatus])
 
-  async function assignVideo(video: Video) {
+  const stats = useMemo(() => {
+    const values = Object.values(lessonStatus)
+    return {
+      assistido: values.filter((v) => v.status === 'assistido').length,
+      solicitado: values.filter((v) => v.status === 'solicitado').length,
+    }
+  }, [lessonStatus])
+
+  function discardAll() {
+    setPending({})
+  }
+
+  async function saveAll() {
     if (!id) return
-    // Atualização otimista: adiciona localmente e reconcilia com o banco
-    const { data, error } = await supabase
-      .from('student_videos')
-      .insert({ student_id: id, video_id: video.id, status: 'solicitado' })
-      .select('*, video:videos(*)')
-      .single()
-    if (error) {
-      setError(error.message)
+    setSaving(true)
+    setError(null)
+    let firstError: string | null = null
+
+    for (const [lessonId, val] of Object.entries(pending)) {
+      const persisted = lessonStatus[lessonId]
+      const persistedVal = persisted?.status ?? ''
+      if (val === persistedVal) continue
+      let err
+      if (val === '') {
+        if (persisted) ({ error: err } = await supabase.from('student_lessons').delete().eq('id', persisted.id))
+      } else if (persisted) {
+        ;({ error: err } = await supabase.from('student_lessons').update({ status: val }).eq('id', persisted.id))
+      } else {
+        ;({ error: err } = await supabase
+          .from('student_lessons')
+          .insert({ student_id: id, lesson_id: lessonId, status: val }))
+      }
+      if (err) {
+        firstError = err.message
+        break
+      }
+    }
+
+    setSaving(false)
+    if (firstError) {
+      setError(firstError)
       return
     }
-    setAssigned((prev) => [...prev, data as StudentVideoWithVideo])
-  }
-
-  async function changeStatus(link: StudentVideoWithVideo, status: StatusVideo) {
-    if (link.status === status) return
-    const prev = assigned
-    // otimista
-    setAssigned((cur) => cur.map((a) => (a.id === link.id ? { ...a, status } : a)))
-    const { error } = await supabase.from('student_videos').update({ status }).eq('id', link.id)
-    if (error) {
-      setError(error.message)
-      setAssigned(prev) // desfaz
-    }
-  }
-
-  async function removeVideo(link: StudentVideoWithVideo) {
-    const prev = assigned
-    setAssigned((cur) => cur.filter((a) => a.id !== link.id))
-    const { error } = await supabase.from('student_videos').delete().eq('id', link.id)
-    if (error) {
-      setError(error.message)
-      setAssigned(prev)
-    }
-  }
-
-  // ---------- Módulos ----------
-  const assignedModuleIds = useMemo(
-    () => new Set(assignedModules.map((a) => a.module_id)),
-    [assignedModules],
-  )
-  const availableModules = useMemo(
-    () => allModules.filter((m) => !assignedModuleIds.has(m.id)),
-    [allModules, assignedModuleIds],
-  )
-
-  async function assignModule(module: Module) {
-    if (!id) return
-    const firstStatus = statuses[0]?.id ?? null
-    const { data, error } = await supabase
-      .from('student_modules')
-      .insert({ student_id: id, module_id: module.id, status_id: firstStatus })
-      .select('*, module:modules(*)')
-      .single()
-    if (error) {
-      setError(error.message)
-      return
-    }
-    setAssignedModules((prev) => [...prev, data as StudentModuleWithModule])
-  }
-
-  async function changeModuleStatus(link: StudentModuleWithModule, statusId: string | null) {
-    const prev = assignedModules
-    setAssignedModules((cur) =>
-      cur.map((a) => (a.id === link.id ? { ...a, status_id: statusId } : a)),
-    )
-    const { error } = await supabase
-      .from('student_modules')
-      .update({ status_id: statusId })
-      .eq('id', link.id)
-    if (error) {
-      setError(error.message)
-      setAssignedModules(prev)
-    }
-  }
-
-  async function removeModule(link: StudentModuleWithModule) {
-    const prev = assignedModules
-    setAssignedModules((cur) => cur.filter((a) => a.id !== link.id))
-    const { error } = await supabase.from('student_modules').delete().eq('id', link.id)
-    if (error) {
-      setError(error.message)
-      setAssignedModules(prev)
-    }
+    setPending({})
+    await load()
   }
 
   if (loading) return <Spinner />
@@ -189,7 +138,7 @@ export function StudentDetailPage() {
     )
 
   return (
-    <div>
+    <div className="pb-24">
       <Link to="/alunos" className="text-sm text-ink-soft hover:text-accent">
         ← Alunos
       </Link>
@@ -203,258 +152,107 @@ export function StudentDetailPage() {
           </div>
         </div>
         <div className="text-right text-sm text-ink-soft">
-          <span className="font-semibold text-ink">{assignedModules.length}</span> módulo(s) ·{' '}
-          <span className="font-semibold text-ink">{assigned.length}</span> vídeo(s) ·{' '}
-          <span className="font-semibold text-assistido">
-            {assigned.filter((a) => a.status === 'assistido').length}
-          </span>{' '}
-          assistido(s)
+          <span className="font-semibold text-assistido">{stats.assistido}</span> assistida(s) ·{' '}
+          <span className="font-semibold text-solicitado">{stats.solicitado}</span> solicitada(s)
         </div>
       </header>
 
       {error && (
-        <p className="mb-4 rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent" role="alert">
+        <p className="mb-4 rounded-lg bg-red-soft px-3 py-2 text-sm text-red" role="alert">
           {error}
         </p>
       )}
 
-      {/* Módulos vinculados */}
       <section className="mb-8">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold text-ink">Módulos do aluno</h2>
-          <Button
-            onClick={() => setShowModulePicker((v) => !v)}
-            variant={showModulePicker ? 'ghost' : 'primary'}
-          >
-            {showModulePicker ? 'Fechar' : '+ Vincular módulos'}
-          </Button>
-        </div>
-
-        {assignedModules.length === 0 ? (
-          <EmptyState
-            title="Nenhum módulo vinculado"
-            description="Clique em “Vincular módulos” para atribuir módulos a este aluno e definir o status."
-          />
-        ) : (
-          <Card className="divide-y divide-line/70">
-            {assignedModules.map((link) => (
-              <div key={link.id} className="flex flex-wrap items-center gap-4 px-5 py-3.5">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-ink">{link.module.nome}</p>
-                  <div className="mt-1">
-                    <LevelPill nivel={link.module.nivel} />
-                  </div>
-                </div>
-
-                <ModuleStatusSelect
-                  statuses={statuses}
-                  value={link.status_id}
-                  onChange={(sid) => changeModuleStatus(link, sid)}
-                />
-
-                <button
-                  onClick={() => removeModule(link)}
-                  className="text-xs font-medium text-ink-faint hover:text-red"
-                  title="Desvincular módulo"
-                >
-                  Remover
-                </button>
-              </div>
-            ))}
-          </Card>
-        )}
-
-        {showModulePicker && (
-          <div className="mt-3">
-            <h3 className="mb-2 text-sm font-semibold text-ink-soft">Adicionar módulos</h3>
-            {availableModules.length === 0 ? (
-              <EmptyState
-                title="Nada para adicionar"
-                description={
-                  allModules.length === 0
-                    ? 'Cadastre módulos na aba Módulos primeiro.'
-                    : 'Todos os módulos já estão vinculados a este aluno.'
-                }
-              />
-            ) : (
-              <Card className="divide-y divide-line/70">
-                {availableModules.map((m) => (
-                  <div key={m.id} className="flex items-center gap-4 px-5 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-ink">{m.nome}</p>
-                      <div className="mt-1">
-                        <LevelPill nivel={m.nivel} />
-                      </div>
-                    </div>
-                    <Button variant="ghost" onClick={() => assignModule(m)}>
-                      + Adicionar
-                    </Button>
-                  </div>
-                ))}
-              </Card>
-            )}
-            {statuses.length === 0 && (
-              <p className="mt-2 text-xs text-ink-faint">
-                Dica: cadastre status na aba <strong>Módulos</strong> para marcá-los aqui.
-              </p>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* Vídeos vinculados */}
-      <section className="mb-8">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold text-ink">Vídeos do aluno</h2>
-          <Button onClick={() => setShowPicker((v) => !v)} variant={showPicker ? 'ghost' : 'primary'}>
-            {showPicker ? 'Fechar' : '+ Vincular vídeos'}
-          </Button>
-        </div>
-
-        {assignedSorted.length === 0 ? (
-          <EmptyState
-            title="Nenhum vídeo vinculado"
-            description="Clique em “Vincular vídeos” para escolher da biblioteca o que este aluno deve assistir."
-          />
-        ) : (
-          <Card className="divide-y divide-line/70">
-            {assignedSorted.map((link) => (
-              <div key={link.id} className="flex flex-wrap items-center gap-4 px-5 py-3.5">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-ink">{link.video.titulo}</p>
-                  <div className="mt-1">
-                    <LevelPill nivel={link.video.nivel} />
-                  </div>
-                </div>
-
-                <StatusToggle value={link.status} onChange={(s) => changeStatus(link, s)} />
-
-                <button
-                  onClick={() => removeVideo(link)}
-                  className="text-xs font-medium text-ink-faint hover:text-accent"
-                  title="Desvincular vídeo"
-                >
-                  Remover
-                </button>
-              </div>
-            ))}
-          </Card>
-        )}
-      </section>
-
-      {/* Seletor de vídeos para vincular */}
-      {showPicker && (
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-lg font-semibold text-ink">Adicionar da biblioteca</h2>
-            <label className="flex items-center gap-2 text-sm text-ink-soft">
-              <input
-                type="checkbox"
-                checked={onlyLevel}
-                onChange={(e) => setOnlyLevel(e.target.checked)}
-                className="accent-[var(--color-accent)]"
-              />
-              Só o nível do aluno{student.nivel ? ` (${student.nivel})` : ''}
-            </label>
-          </div>
-
-          {available.length === 0 ? (
-            <EmptyState
-              title="Nada para adicionar"
-              description={
-                allVideos.length === 0
-                  ? 'Cadastre vídeos na aba Vídeos primeiro.'
-                  : 'Todos os vídeos elegíveis já estão vinculados. Desmarque o filtro de nível para ver os demais.'
-              }
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-display text-lg font-semibold text-ink">Aulas do aluno</h2>
+          <label className="flex items-center gap-2 text-sm text-ink-soft">
+            <input
+              type="checkbox"
+              checked={onlyLevel}
+              onChange={(e) => setOnlyLevel(e.target.checked)}
+              className="accent-[var(--color-accent)]"
             />
-          ) : (
-            <Card className="divide-y divide-line/70">
-              {available.map((v) => (
-                <div key={v.id} className="flex items-center gap-4 px-5 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-ink">{v.titulo}</p>
-                    <div className="mt-1">
-                      <LevelPill nivel={v.nivel} />
-                    </div>
-                  </div>
-                  <Button variant="ghost" onClick={() => assignVideo(v)}>
-                    + Adicionar
-                  </Button>
+            Só o nível do aluno{student.nivel ? ` (${student.nivel})` : ''}
+          </label>
+        </div>
+
+        {modulesWithLessons.length === 0 ? (
+          <EmptyState
+            title="Nenhuma aula disponível"
+            description={
+              modules.length === 0
+                ? 'Cadastre módulos e aulas na aba Módulos primeiro.'
+                : 'Nenhum módulo com aulas para este nível. Desmarque o filtro para ver todos.'
+            }
+          />
+        ) : (
+          <div className="space-y-4">
+            {modulesWithLessons.map((m) => (
+              <Card key={m.id} className="overflow-hidden">
+                <div className="flex items-center gap-3 border-b border-line bg-paper/60 px-5 py-3">
+                  <span className="font-semibold text-ink">{m.nome}</span>
+                  <LevelPill nivel={m.nivel} />
                 </div>
-              ))}
-            </Card>
-          )}
-        </section>
+                <div className="divide-y divide-line/70">
+                  {lessonsByModule[m.id].map((lesson) => {
+                    const val = lessonValue(lesson.id)
+                    const changed = lesson.id in pending && val !== (lessonStatus[lesson.id]?.status ?? '')
+                    return (
+                      <div
+                        key={lesson.id}
+                        className={`flex items-center gap-4 px-5 py-3 ${changed ? 'bg-accent-soft/40' : ''}`}
+                      >
+                        <span className="w-6 text-xs text-ink-faint">{lesson.ordem}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-ink">{lesson.nome}</span>
+                        {changed && <span className="text-xs font-semibold text-accent">alterado</span>}
+                        <LessonStatusSelect
+                          value={val}
+                          onChange={(s) => setPending((cur) => ({ ...cur, [lesson.id]: s }))}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Barra de salvar (aparece quando há alterações) */}
+      {dirtyCount > 0 && (
+        <div className="sticky bottom-4 z-20 mx-auto flex max-w-lg items-center justify-between gap-4 rounded-xl border border-line bg-surface px-4 py-3 shadow-[0_12px_30px_-10px_rgba(11,30,70,0.4)]">
+          <span className="text-sm font-medium text-ink">{dirtyCount} alteração(ões) não salva(s)</span>
+          <div className="flex gap-2">
+            <BtnCancelar size="sm" onClick={discardAll} disabled={saving} />
+            <BtnSalvar size="sm" onClick={saveAll} disabled={saving} label={saving ? 'Salvando…' : 'Salvar'} />
+          </div>
+        </div>
       )}
     </div>
   )
 }
 
-// Controle segmentado dos dois estados manuais
-function StatusToggle({
+// Dropdown de status da aula (— / Solicitado / Assistido)
+function LessonStatusSelect({
   value,
   onChange,
 }: {
-  value: StatusVideo
-  onChange: (s: StatusVideo) => void
+  value: '' | StatusVideo
+  onChange: (s: '' | StatusVideo) => void
 }) {
+  const tone =
+    value === 'assistido' ? 'text-assistido' : value === 'solicitado' ? 'text-solicitado' : 'text-ink-faint'
   return (
-    <div className="flex items-center gap-2">
-      <div className="hidden sm:block">
-        <StatusBadge status={value} />
-      </div>
-      <div className="inline-flex overflow-hidden rounded-lg border border-line">
-        <button
-          onClick={() => onChange('solicitado')}
-          className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
-            value === 'solicitado' ? 'bg-solicitado-bg text-solicitado' : 'bg-surface text-ink-faint hover:bg-paper'
-          }`}
-        >
-          Solicitado
-        </button>
-        <button
-          onClick={() => onChange('assistido')}
-          className={`border-l border-line px-3 py-1.5 text-xs font-semibold transition-colors ${
-            value === 'assistido' ? 'bg-assistido-bg text-assistido' : 'bg-surface text-ink-faint hover:bg-paper'
-          }`}
-        >
-          Assistido
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// Dropdown do status personalizado (módulos)
-function ModuleStatusSelect({
-  statuses,
-  value,
-  onChange,
-}: {
-  statuses: ModuleStatus[]
-  value: string | null
-  onChange: (statusId: string | null) => void
-}) {
-  const current = statuses.find((s) => s.id === value)
-  return (
-    <div className="flex items-center gap-2">
-      <span
-        className="hidden h-2.5 w-2.5 shrink-0 rounded-full sm:block"
-        style={{ backgroundColor: current?.cor ?? '#cbd5e1' }}
-      />
-      <select
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value || null)}
-        className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold focus:border-accent focus:outline-none"
-        style={current ? { color: current.cor } : { color: 'var(--color-ink-faint)' }}
-      >
-        <option value="">— sem status —</option>
-        {statuses.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.nome}
-          </option>
-        ))}
-      </select>
-    </div>
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value as '' | StatusVideo)}
+      className={`rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold focus:border-accent focus:outline-none ${tone}`}
+    >
+      <option value="">— não iniciada</option>
+      <option value="solicitado">Solicitado</option>
+      <option value="assistido">Assistido</option>
+    </select>
   )
 }

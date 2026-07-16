@@ -7,12 +7,13 @@
    deliberadas para Solicitado (âmbar) e Assistido (verde).
    ============================================================ */
 @theme {
-  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
-  --color-paper: #f4f6fb;
+  --color-paper: #eef1f8;
   --color-surface: #ffffff;
   --color-ink: #0b1220;
+  --color-navy: #0b1e46;
   --color-ink-soft: #475569;
   --color-ink-faint: #94a3b8;
   --color-line: #e6e9f2;
