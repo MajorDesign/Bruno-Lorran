@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { ModulesPage } from './pages/ModulesPage'
 import { StudentsPage } from './pages/StudentsPage'
 import { StudentDetailPage } from './pages/StudentDetailPage'
+import { AdminsPage } from './pages/AdminsPage'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/alunos" element={<StudentsPage />} />
         <Route path="/alunos/:id" element={<StudentDetailPage />} />
         <Route path="/modulos" element={<ModulesPage />} />
+        <Route path="/administradores" element={<AdminsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
