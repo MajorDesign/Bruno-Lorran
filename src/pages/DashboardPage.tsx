@@ -15,7 +15,7 @@ interface Stats {
   totalAulas: number
   aulasSolicitadas: number
   aulasAssistidas: number
-  alunosPorNivel: Bar[]
+  aulasPorNivel: Bar[]
   aulasPorModulo: Bar[]
 }
 
@@ -26,9 +26,9 @@ export function DashboardPage() {
   useEffect(() => {
     async function load() {
       const [alunosRes, modulosRes, aulasRes, slRes] = await Promise.all([
-        supabase.from('students').select('nivel'),
+        supabase.from('students').select('id'),
         supabase.from('modules').select('id, nome, ordem'),
-        supabase.from('lessons').select('module_id'),
+        supabase.from('lessons').select('module_id, nivel'),
         supabase.from('student_lessons').select('status'),
       ])
 
@@ -38,13 +38,13 @@ export function DashboardPage() {
         return
       }
 
-      const alunos = (alunosRes.data ?? []) as { nivel: string | null }[]
+      const alunos = (alunosRes.data ?? []) as { id: string }[]
       const modulos = (modulosRes.data ?? []) as { id: string; nome: string; ordem: number }[]
-      const aulas = (aulasRes.data ?? []) as { module_id: string }[]
+      const aulas = (aulasRes.data ?? []) as { module_id: string; nivel: string | null }[]
       const sl = (slRes.data ?? []) as { status: string }[]
 
-      // Alunos por nível
-      const alunosPorNivel = agrupaPorNivel(alunos)
+      // Aulas por nível
+      const aulasPorNivel = agrupaPorNivel(aulas)
 
       // Aulas por módulo
       const perModule = new Map<string, number>()
@@ -59,7 +59,7 @@ export function DashboardPage() {
         totalAulas: aulas.length,
         aulasSolicitadas: sl.filter((v) => v.status === 'solicitado').length,
         aulasAssistidas: sl.filter((v) => v.status === 'assistido').length,
-        alunosPorNivel,
+        aulasPorNivel,
         aulasPorModulo,
       })
     }
@@ -113,9 +113,9 @@ export function DashboardPage() {
       {/* Painéis */}
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <BarPanel
-          title="Alunos por nível"
-          data={stats.alunosPorNivel}
-          empty="Nenhum aluno cadastrado ainda."
+          title="Aulas por nível"
+          data={stats.aulasPorNivel}
+          empty="Nenhuma aula com nível ainda."
           barClass="bg-accent"
         />
         <BarPanel

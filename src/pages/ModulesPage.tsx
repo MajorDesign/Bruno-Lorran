@@ -26,14 +26,13 @@ export function ModulesPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [nome, setNome] = useState('')
-  const [nivel, setNivel] = useState('')
   const [ordem, setOrdem] = useState('')
   const [saving, setSaving] = useState(false)
 
   async function load() {
     setLoading(true)
     const [modRes, lessonRes] = await Promise.all([
-      supabase.from('modules').select('*').order('nivel').order('ordem'),
+      supabase.from('modules').select('*').order('ordem'),
       supabase.from('lessons').select('*').order('ordem'),
     ])
     if (modRes.error) setError(modRes.error.message)
@@ -54,14 +53,12 @@ export function ModulesPage() {
   function openCreate() {
     setEditingId(null)
     setNome('')
-    setNivel('')
     setOrdem('')
     setShowForm(true)
   }
   function openEdit(m: Module) {
     setEditingId(m.id)
     setNome(m.nome)
-    setNivel(m.nivel ?? '')
     setOrdem(String(m.ordem))
     setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -75,7 +72,7 @@ export function ModulesPage() {
     e.preventDefault()
     setSaving(true)
     setError(null)
-    const payload = { nome: nome.trim(), nivel: nivel || null, ordem: ordem ? Number(ordem) : 0 }
+    const payload = { nome: nome.trim(), ordem: ordem ? Number(ordem) : 0 }
     const { error } = editingId
       ? await supabase.from('modules').update(payload).eq('id', editingId)
       : await supabase.from('modules').insert(payload)
@@ -106,7 +103,7 @@ export function ModulesPage() {
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Módulos</h1>
           <p className="mt-1 text-sm text-ink-soft">
-            Cada módulo agrupa suas aulas. Abra um módulo para gerenciar as aulas dele.
+            Cada módulo agrupa suas aulas. Abra um módulo para gerenciar as aulas dele (o nível fica em cada aula).
           </p>
         </div>
         {!showForm && <BtnNovo label="Novo módulo" onClick={openCreate} />}
@@ -117,33 +114,19 @@ export function ModulesPage() {
           <h2 className="mb-4 font-display text-lg font-semibold text-ink">
             {editingId ? 'Alterar módulo' : 'Novo módulo'}
           </h2>
-          <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-6">
-            <div className="sm:col-span-3">
+          <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[240px] flex-1">
               <Field label="Nome do módulo">
                 <TextInput required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Module 1" />
               </Field>
             </div>
-            <div className="sm:col-span-2">
-              <Field label="Nível">
-                <Select value={nivel} onChange={(e) => setNivel(e.target.value)}>
-                  <option value="">Selecione…</option>
-                  {NIVEIS.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-            <div className="sm:col-span-1">
+            <div className="w-24">
               <Field label="Ordem">
                 <TextInput type="number" min={0} value={ordem} onChange={(e) => setOrdem(e.target.value)} placeholder="0" />
               </Field>
             </div>
-            <div className="flex justify-end gap-2 sm:col-span-6">
-              <BtnCancelar onClick={closeForm} disabled={saving} />
-              <BtnSalvar type="submit" disabled={saving || !nome.trim()} label={saving ? 'Salvando…' : 'Salvar'} />
-            </div>
+            <BtnCancelar onClick={closeForm} disabled={saving} />
+            <BtnSalvar type="submit" disabled={saving || !nome.trim()} label={saving ? 'Salvando…' : 'Salvar'} />
           </form>
         </Card>
       )}
@@ -183,7 +166,7 @@ export function ModulesPage() {
   )
 }
 
-/* ================= Card de módulo (expansível, com lições) ================= */
+/* ================= Card de módulo (expansível, com aulas) ================= */
 function ModuleCard({
   module,
   lessons,
@@ -204,11 +187,13 @@ function ModuleCard({
   setError: (m: string | null) => void
 }) {
   const [nome, setNome] = useState('')
+  const [nivel, setNivel] = useState('')
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   function resetLessonForm() {
     setNome('')
+    setNivel('')
     setEditingLessonId(null)
   }
 
@@ -217,10 +202,10 @@ function ModuleCard({
     setSaving(true)
     setError(null)
     const { error } = editingLessonId
-      ? await supabase.from('lessons').update({ nome: nome.trim() }).eq('id', editingLessonId)
+      ? await supabase.from('lessons').update({ nome: nome.trim(), nivel: nivel || null }).eq('id', editingLessonId)
       : await supabase
           .from('lessons')
-          .insert({ module_id: module.id, nome: nome.trim(), ordem: lessons.length + 1 })
+          .insert({ module_id: module.id, nome: nome.trim(), nivel: nivel || null, ordem: lessons.length + 1 })
     setSaving(false)
     if (error) return setError(error.message)
     resetLessonForm()
@@ -230,6 +215,7 @@ function ModuleCard({
   function editLesson(l: Lesson) {
     setEditingLessonId(l.id)
     setNome(l.nome)
+    setNivel(l.nivel ?? '')
   }
 
   async function deleteLesson(l: Lesson) {
@@ -248,7 +234,6 @@ function ModuleCard({
             <ChevronIcon />
           </span>
           <span className="truncate font-semibold text-ink">{module.nome}</span>
-          <LevelPill nivel={module.nivel} />
           <span className="text-xs text-ink-faint">
             {lessons.length} {lessons.length === 1 ? 'aula' : 'aulas'}
           </span>
@@ -257,7 +242,7 @@ function ModuleCard({
         <BtnExcluir size="sm" onClick={onDelete} />
       </div>
 
-      {/* Lições do módulo */}
+      {/* Aulas do módulo */}
       {expanded && (
         <div className="border-t border-line bg-paper/50 px-5 py-4">
           {lessons.length === 0 ? (
@@ -268,6 +253,7 @@ function ModuleCard({
                 <li key={l.id} className="flex items-center gap-3 px-4 py-2.5">
                   <span className="w-6 text-xs text-ink-faint">{l.ordem}</span>
                   <span className="min-w-0 flex-1 truncate text-sm text-ink">{l.nome}</span>
+                  <LevelPill nivel={l.nivel} />
                   <BtnAlterar size="sm" onClick={() => editLesson(l)} />
                   <BtnExcluir size="sm" onClick={() => deleteLesson(l)} />
                 </li>
@@ -275,13 +261,22 @@ function ModuleCard({
             </ul>
           )}
 
-          <form onSubmit={submitLesson} className="flex flex-wrap gap-2">
-            <TextInput
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder={editingLessonId ? 'Alterar nome da aula' : 'Ex.: Lesson 1 — My Wonderful Family'}
-              className="min-w-[220px] flex-1"
-            />
+          <form onSubmit={submitLesson} className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[220px] flex-1">
+              <TextInput
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder={editingLessonId ? 'Alterar nome da aula' : 'Ex.: Lesson 1 — My Wonderful Family'}
+              />
+            </div>
+            <Select value={nivel} onChange={(e) => setNivel(e.target.value)} className="w-44">
+              <option value="">Nível…</option>
+              {NIVEIS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </Select>
             {editingLessonId && <BtnCancelar onClick={resetLessonForm} disabled={saving} />}
             <BtnSalvar
               type="submit"
