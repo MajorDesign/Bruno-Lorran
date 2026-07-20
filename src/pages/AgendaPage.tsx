@@ -5,7 +5,7 @@ import { CORES_EVENTO, type AgendaEvent, type EventStatus, type Group, type Stud
 import { addDays, addMonths, sameDay, startOfDay } from '../lib/schedule'
 import { BtnCancelar, BtnExcluir, BtnNovo, BtnSalvar, Field, Select, Spinner, TextInput } from '../components/ui'
 
-type EventRow = AgendaEvent & { student: { nome: string } | null; group: { nome: string } | null }
+type EventRow = AgendaEvent & { student: { nome: string; foto_url: string | null } | null; group: { nome: string } | null }
 
 const DIAS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB']
 const STATUS_INFO: Record<EventStatus, { dot: string; label: string }> = {
@@ -52,7 +52,7 @@ export function AgendaPage() {
   const loadEvents = useCallback(async () => {
     const { data, error } = await supabase
       .from('events')
-      .select('*, student:students(nome), group:groups(nome)')
+      .select('*, student:students(nome, foto_url), group:groups(nome)')
       .gte('start_at', range.gridStart.toISOString())
       .lte('start_at', range.gridEnd.toISOString())
     if (error) setError(error.message)
@@ -82,7 +82,7 @@ export function AgendaPage() {
     ;(async () => {
       const { data } = await supabase
         .from('events')
-        .select('*, student:students(nome), group:groups(nome)')
+        .select('*, student:students(nome, foto_url), group:groups(nome)')
         .eq('id', evId)
         .single()
       if (data) {
@@ -267,7 +267,7 @@ function DayColumn({
         </button>
       </div>
 
-      <div className="min-h-[80px] space-y-2 p-2">
+      <div className="min-h-[560px] space-y-2 p-2">
         {showFree ? (
           free.length === 0 ? (
             <p className="px-1 py-2 text-xs text-ink-faint">Sem horários livres</p>
@@ -298,7 +298,7 @@ function EventChip({ e, onOpen }: { e: EventRow; onOpen: (e: EventRow) => void }
       className="flex w-full items-center gap-2 rounded-md border border-line bg-surface px-2 py-2 shadow-sm hover:bg-paper"
       style={{ borderLeft: `4px solid ${e.cor || BAR}` }}
     >
-      <StatusDot status={e.status} />
+      <EventAvatar src={e.student?.foto_url ?? null} nome={e.titulo} status={e.status} isGroup={!!e.group_id} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-bold uppercase text-ink">{e.titulo}</span>
         <span className="text-[11px] text-ink-soft">
@@ -309,15 +309,33 @@ function EventChip({ e, onOpen }: { e: EventRow; onOpen: (e: EventRow) => void }
   )
 }
 
-function StatusDot({ status }: { status: EventStatus | null }) {
-  if (!status)
-    return (
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" className="shrink-0">
-        <rect x="3" y="4" width="18" height="18" rx="2" />
-        <path d="M16 2v4M8 2v4M3 10h18" />
-      </svg>
-    )
-  return <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: STATUS_INFO[status].dot }} />
+function EventAvatar({ src, nome, status, isGroup }: { src: string | null; nome: string; status: EventStatus | null; isGroup: boolean }) {
+  return (
+    <span className="relative shrink-0">
+      {src ? (
+        <img src={src} alt="" className="h-8 w-8 rounded-full object-cover" />
+      ) : (
+        <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${isGroup ? 'bg-red-soft text-red' : 'bg-accent-soft text-accent'}`}>
+          {isGroup ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          ) : (
+            nome.charAt(0).toUpperCase()
+          )}
+        </span>
+      )}
+      {status && (
+        <span
+          className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface"
+          style={{ backgroundColor: STATUS_INFO[status].dot }}
+          title={STATUS_INFO[status].label}
+        />
+      )}
+    </span>
+  )
 }
 
 function PlusMini() {
@@ -355,23 +373,26 @@ function MonthGrid({
           const inMonth = day.getMonth() === refMonth
           const isToday = sameDay(day, new Date())
           return (
-            <div key={day.toISOString()} className={`min-h-[92px] border-b border-r border-line p-1 ${inMonth ? 'bg-surface' : 'bg-paper/50'}`}>
+            <div key={day.toISOString()} className="min-h-[120px] border-b border-r border-line bg-surface p-1.5">
               <div className={`mb-1 text-xs font-semibold ${isToday ? 'text-accent' : inMonth ? 'text-ink' : 'text-ink-faint'}`}>{day.getDate()}</div>
               <div className="space-y-1">
-                {evs.slice(0, 3).map((e) => (
+                {evs.slice(0, 4).map((e) => (
                   <button
                     key={e.id}
                     onClick={() => onOpen(e)}
-                    className="flex w-full items-center gap-1 truncate rounded border-l-2 px-1 text-left text-[10px] text-ink hover:bg-paper"
+                    className="flex w-full items-center gap-1 rounded border-l-2 px-1 py-0.5 text-left text-[10px] leading-tight text-ink hover:bg-paper"
                     style={{ borderColor: e.cor || BAR }}
                   >
-                    <StatusDot status={e.status} />
-                    <span className="truncate">
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: e.status ? STATUS_INFO[e.status].dot : 'var(--color-ink-faint)' }}
+                    />
+                    <span className="min-w-0 flex-1 truncate">
                       {fmtTime(e.start_at)} {e.titulo}
                     </span>
                   </button>
                 ))}
-                {evs.length > 3 && <p className="px-1 text-[10px] text-ink-faint">+{evs.length - 3}</p>}
+                {evs.length > 4 && <p className="px-1 text-[10px] text-ink-faint">+{evs.length - 4}</p>}
               </div>
             </div>
           )
@@ -413,6 +434,21 @@ function EventModal({
   const [notasAluno, setNotasAluno] = useState(event?.anotacoes_aluno ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [groupMembers, setGroupMembers] = useState<{ id: string; nome: string; foto_url: string | null }[]>([])
+
+  useEffect(() => {
+    if (!event?.group_id) {
+      setGroupMembers([])
+      return
+    }
+    ;(async () => {
+      const gm = await supabase.from('group_members').select('student_id').eq('group_id', event.group_id!)
+      const ids = ((gm.data ?? []) as { student_id: string }[]).map((x) => x.student_id)
+      if (!ids.length) return setGroupMembers([])
+      const stu = await supabase.from('students').select('id, nome, foto_url').in('id', ids).order('nome')
+      setGroupMembers((stu.data as { id: string; nome: string; foto_url: string | null }[]) ?? [])
+    })()
+  }, [event])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -522,6 +558,28 @@ function EventModal({
               </optgroup>
             </Select>
           </Field>
+
+          {groupMembers.length > 0 && (
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-faint">
+                Participantes do grupo ({groupMembers.length})
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {groupMembers.map((m) => (
+                  <span key={m.id} className="flex items-center gap-2 rounded-full border border-line bg-paper py-1 pl-1 pr-3 text-sm text-ink">
+                    {m.foto_url ? (
+                      <img src={m.foto_url} alt="" className="h-7 w-7 rounded-full object-cover" />
+                    ) : (
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent">
+                        {m.nome.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    {m.nome}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {!isEdit && (
             <Field label="Status">

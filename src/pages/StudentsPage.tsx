@@ -72,7 +72,15 @@ export function StudentsPage() {
           <h1 className="font-display text-2xl font-semibold text-ink">Alunos</h1>
           <p className="mt-1 text-sm text-ink-soft">Gerencie alunos, grupos e as aulas de cada um.</p>
         </div>
-        <BtnNovo label="Novo aluno" onClick={() => navigate('/alunos/novo')} />
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate('/grupos/novo')}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-ink hover:bg-paper"
+          >
+            + Novo grupo
+          </button>
+          <BtnNovo label="Novo aluno" onClick={() => navigate('/alunos/novo')} />
+        </div>
       </header>
 
       {error && (
@@ -121,9 +129,12 @@ export function StudentsPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 {filteredGroups.map((g) => (
                   <Card key={g.id} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-ink">{g.nome}</p>
-                      <BtnExcluir size="sm" onClick={() => handleDeleteGroup(g)} />
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="min-w-0 truncate font-semibold text-ink">{g.nome}</p>
+                      <div className="flex shrink-0 gap-2">
+                        <BtnAlterar size="sm" onClick={() => navigate(`/grupos/editar/${g.id}`)} />
+                        <BtnExcluir size="sm" onClick={() => handleDeleteGroup(g)} />
+                      </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {g.members.map((m) => (

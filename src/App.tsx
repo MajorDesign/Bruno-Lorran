@@ -7,7 +7,9 @@ import { ModulesPage } from './pages/ModulesPage'
 import { StudentsPage } from './pages/StudentsPage'
 import { StudentDetailPage } from './pages/StudentDetailPage'
 import { StudentFormPage } from './pages/StudentFormPage'
+import { GroupFormPage } from './pages/GroupFormPage'
 import { AgendaPage } from './pages/AgendaPage'
+import { ReportsPage } from './pages/ReportsPage'
 import { AdminsPage } from './pages/AdminsPage'
 import { ConfigPage } from './pages/ConfigPage'
 
@@ -29,8 +31,11 @@ export default function App() {
         <Route path="/alunos" element={<StudentsPage />} />
         <Route path="/alunos/novo" element={<StudentFormPage />} />
         <Route path="/alunos/editar/:id" element={<StudentFormPage />} />
+        <Route path="/grupos/novo" element={<GroupFormPage />} />
+        <Route path="/grupos/editar/:id" element={<GroupFormPage />} />
         <Route path="/alunos/:id" element={<StudentDetailPage />} />
         <Route path="/modulos" element={<ModulesPage />} />
+        <Route path="/relatorios" element={<ReportsPage />} />
         <Route path="/administradores" element={<AdminsPage />} />
         <Route path="/configuracoes" element={<ConfigPage />} />
       </Route>

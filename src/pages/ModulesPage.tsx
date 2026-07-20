@@ -248,42 +248,54 @@ function ModuleCard({
           {lessons.length === 0 ? (
             <p className="mb-3 text-sm text-ink-faint">Nenhuma aula neste módulo ainda.</p>
           ) : (
-            <ul className="mb-3 divide-y divide-line/70 overflow-hidden rounded-lg border border-line bg-surface">
+            <ul className="mb-3 max-h-[320px] divide-y divide-line/70 overflow-y-auto rounded-lg border border-line bg-surface">
               {lessons.map((l) => (
-                <li key={l.id} className="flex items-center gap-3 px-4 py-2.5">
-                  <span className="w-6 text-xs text-ink-faint">{l.ordem}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-ink">{l.nome}</span>
-                  <LevelPill nivel={l.nivel} />
-                  <BtnAlterar size="sm" onClick={() => editLesson(l)} />
-                  <BtnExcluir size="sm" onClick={() => deleteLesson(l)} />
+                <li key={l.id} className="px-4 py-2.5">
+                  {editingLessonId === l.id ? (
+                    <form onSubmit={submitLesson} className="flex flex-wrap items-center gap-2">
+                      <span className="w-6 text-xs text-ink-faint">{l.ordem}</span>
+                      <TextInput value={nome} onChange={(e) => setNome(e.target.value)} className="min-w-[200px] flex-1" autoFocus />
+                      <Select value={nivel} onChange={(e) => setNivel(e.target.value)} className="w-40">
+                        <option value="">Nível…</option>
+                        {NIVEIS.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </Select>
+                      <BtnSalvar size="sm" type="submit" disabled={saving || !nome.trim()} label={saving ? '…' : 'Salvar'} />
+                      <BtnCancelar size="sm" onClick={resetLessonForm} disabled={saving} />
+                    </form>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 text-xs text-ink-faint">{l.ordem}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm text-ink">{l.nome}</span>
+                      <LevelPill nivel={l.nivel} />
+                      <BtnAlterar size="sm" onClick={() => editLesson(l)} />
+                      <BtnExcluir size="sm" onClick={() => deleteLesson(l)} />
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
           )}
 
-          <form onSubmit={submitLesson} className="flex flex-wrap items-end gap-2">
-            <div className="min-w-[220px] flex-1">
-              <TextInput
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                placeholder={editingLessonId ? 'Alterar nome da aula' : 'Ex.: Lesson 1 — My Wonderful Family'}
-              />
-            </div>
-            <Select value={nivel} onChange={(e) => setNivel(e.target.value)} className="w-44">
-              <option value="">Nível…</option>
-              {NIVEIS.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </Select>
-            {editingLessonId && <BtnCancelar onClick={resetLessonForm} disabled={saving} />}
-            <BtnSalvar
-              type="submit"
-              disabled={saving || !nome.trim()}
-              label={saving ? '…' : editingLessonId ? 'Salvar' : 'Adicionar aula'}
-            />
-          </form>
+          {editingLessonId === null && (
+            <form onSubmit={submitLesson} className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[220px] flex-1">
+                <TextInput value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Lesson 1 — My Wonderful Family" />
+              </div>
+              <Select value={nivel} onChange={(e) => setNivel(e.target.value)} className="w-44">
+                <option value="">Nível…</option>
+                {NIVEIS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </Select>
+              <BtnSalvar type="submit" disabled={saving || !nome.trim()} label={saving ? '…' : 'Adicionar aula'} />
+            </form>
+          )}
         </div>
       )}
     </Card>

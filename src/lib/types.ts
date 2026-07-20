@@ -26,6 +26,8 @@ export interface Student {
   nome: string
   email: string | null
   telefone: string | null
+  cpf: string | null
+  nascimento: string | null
   foto_url: string | null
   observacoes: string | null
   created_at: string

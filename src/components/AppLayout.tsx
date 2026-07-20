@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { WelcomeSplash } from './WelcomeSplash'
@@ -21,6 +21,8 @@ export function AppLayout() {
   }
 
   const initial = (user?.email?.[0] ?? 'A').toUpperCase()
+  const { pathname } = useLocation()
+  const wide = pathname.startsWith('/agenda')
 
   return (
     <div className="flex min-h-screen flex-col bg-paper">
@@ -77,6 +79,7 @@ export function AppLayout() {
             <NavItem to="/agenda" icon={<CalendarIcon />} label="Agenda" collapsed={collapsed} />
             <NavItem to="/alunos" icon={<UsersIcon />} label="Alunos" collapsed={collapsed} />
             <NavItem to="/modulos" icon={<ModulesIcon />} label="Módulos" collapsed={collapsed} />
+            <NavItem to="/relatorios" icon={<ChartIcon />} label="Relatórios" collapsed={collapsed} />
             <NavItem to="/administradores" icon={<ShieldIcon />} label="Administradores" collapsed={collapsed} />
             <NavItem to="/configuracoes" icon={<GearIcon />} label="Configurações" collapsed={collapsed} />
           </nav>
@@ -84,7 +87,7 @@ export function AppLayout() {
 
         {/* ---------- Conteúdo ---------- */}
         <main className="min-w-0 flex-1 overflow-x-hidden">
-          <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
+          <div className={`mx-auto ${wide ? 'max-w-[1600px]' : 'max-w-6xl'} px-5 py-8 sm:px-8`}>
             <Outlet />
           </div>
         </main>
@@ -168,6 +171,16 @@ function ModulesIcon() {
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
       <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
+    </svg>
+  )
+}
+function ChartIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3v18h18" />
+      <rect x="7" y="12" width="3" height="5" />
+      <rect x="12" y="8" width="3" height="9" />
+      <rect x="17" y="5" width="3" height="12" />
     </svg>
   )
 }

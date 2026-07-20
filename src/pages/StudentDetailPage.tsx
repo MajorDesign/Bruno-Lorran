@@ -153,7 +153,7 @@ export function StudentDetailPage() {
     })
   }
   // Com filtro ativo, expande automaticamente para mostrar os resultados
-  const isExpanded = (mid: string) => filter !== 'todos' || expanded.has(mid)
+  const isExpanded = (mid: string) => expanded.has(mid)
 
   async function saveAll() {
     if (!id) return
@@ -243,6 +243,8 @@ export function StudentDetailPage() {
               <dl className="mt-3 space-y-1.5 text-sm">
                 <InfoRow label="E-mail" value={student.email} />
                 <InfoRow label="Telefone" value={student.telefone} />
+                <InfoRow label="CPF" value={student.cpf} />
+                <InfoRow label="Nascimento" value={fmtNasc(student.nascimento)} />
                 <InfoRow label="Observações" value={student.observacoes} />
               </dl>
               <button
@@ -354,8 +356,7 @@ export function StudentDetailPage() {
               <Card key={m.id} className="overflow-hidden">
                 <button
                   onClick={() => toggleExpand(m.id)}
-                  disabled={filter !== 'todos'}
-                  className="flex w-full items-center gap-3 bg-paper/60 px-5 py-3 text-left disabled:cursor-default"
+                  className="flex w-full items-center gap-3 bg-paper/60 px-5 py-3 text-left"
                   aria-expanded={open}
                 >
                   <span className={`text-ink-faint transition-transform ${open ? 'rotate-90' : ''}`}>
@@ -370,7 +371,7 @@ export function StudentDetailPage() {
                 </button>
 
                 {open && (
-                  <div className="divide-y divide-line/70 border-t border-line">
+                  <div className="max-h-[320px] divide-y divide-line/70 overflow-y-auto border-t border-line">
                     {lessons.map((lesson) => {
                       const val = effectiveStatus(lesson.id)
                       const changed = lesson.id in pending && val !== persistedStatus(lesson.id)
@@ -546,6 +547,17 @@ function EventBadge({ status }: { status: 'pendente' | 'realizada' | 'cancelada'
     cancelada: { label: 'Cancelada', cls: 'bg-red-soft text-red' },
   }[status]
   return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${map.cls}`}>{map.label}</span>
+}
+
+function fmtNasc(d: string | null): string | null {
+  if (!d) return null
+  const [y, m, day] = d.split('-').map(Number)
+  if (!y || !m || !day) return d
+  const hoje = new Date()
+  let idade = hoje.getFullYear() - y
+  const mDiff = hoje.getMonth() + 1 - m
+  if (mDiff < 0 || (mDiff === 0 && hoje.getDate() < day)) idade--
+  return `${String(day).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y} (${idade} anos)`
 }
 
 function fmtDia(iso: string) {
