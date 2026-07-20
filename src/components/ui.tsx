@@ -115,7 +115,9 @@ export function EmptyState({
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-[var(--radius-card)] border border-line bg-surface ${className}`}>
+    <div
+      className={`rounded-[var(--radius-card)] border border-line border-t-[3px] border-t-accent bg-surface shadow-sm ${className}`}
+    >
       {children}
     </div>
   )

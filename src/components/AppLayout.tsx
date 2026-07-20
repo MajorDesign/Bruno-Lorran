@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 import { WelcomeSplash } from './WelcomeSplash'
 
 // Shell autenticado: topbar + sidebar retrátil em navy escuro; conteúdo claro.
@@ -15,14 +16,42 @@ export function AppLayout() {
     localStorage.setItem('bl_sidebar', collapsed ? 'collapsed' : 'expanded')
   }, [collapsed])
 
+  // Contadores exibidos no painel do usuário (alunos e agendas)
+  const [counts, setCounts] = useState({ alunos: 0, agendas: 0 })
+  useEffect(() => {
+    let active = true
+    Promise.all([
+      supabase.from('students').select('id', { count: 'exact', head: true }),
+      supabase.from('events').select('id', { count: 'exact', head: true }),
+    ]).then(([a, e]) => {
+      if (active) setCounts({ alunos: a.count ?? 0, agendas: e.count ?? 0 })
+    })
+    return () => {
+      active = false
+    }
+  }, [])
+
   async function handleSignOut() {
     await signOut()
     navigate('/login', { replace: true })
   }
 
   const initial = (user?.email?.[0] ?? 'A').toUpperCase()
+  const avatarUrl = (user?.user_metadata?.avatar_url as string | undefined) ?? null
+  const displayName = (user?.user_metadata?.full_name as string | undefined)?.trim() || 'Administrador'
   const { pathname } = useLocation()
   const wide = pathname.startsWith('/agenda')
+  const SEG: Record<string, string> = {
+    dashboard: 'Dashboard',
+    agenda: 'Agenda',
+    alunos: 'Alunos',
+    grupos: 'Grupos',
+    modulos: 'Módulos',
+    relatorios: 'Relatórios',
+    administradores: 'Administradores',
+    configuracoes: 'Configurações',
+  }
+  const crumb = SEG[pathname.split('/')[1]] ?? ''
 
   return (
     <div className="flex min-h-screen flex-col bg-paper">
@@ -39,7 +68,7 @@ export function AppLayout() {
           >
             <MenuIcon />
           </button>
-          <span className="h-6 w-1.5 rounded-full bg-gradient-to-b from-[#4f7cff] to-[#f43f6e]" />
+          <span className="h-6 w-1.5 rounded-full bg-gradient-to-b from-[#bf0a30] to-[#0a3161]" />
           <p className="font-display text-lg font-semibold leading-none tracking-tight">Bruno Lorran</p>
           <span className="ml-1 hidden text-[11px] font-semibold uppercase tracking-widest text-white/40 sm:inline">
             Plataforma de Inglês
@@ -48,11 +77,9 @@ export function AppLayout() {
 
         <div className="flex items-center gap-3">
           <div className="hidden items-center gap-2.5 sm:flex">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#4f7cff] to-[#f43f6e] text-sm font-bold text-white">
-              {initial}
-            </span>
+            <Avatar url={avatarUrl} initial={initial} className="h-8 w-8 text-sm" />
             <div className="leading-tight">
-              <p className="text-sm font-semibold">Administrador</p>
+              <p className="text-sm font-semibold">{displayName}</p>
               <p className="max-w-[160px] truncate text-[11px] text-white/45" title={user?.email ?? ''}>
                 {user?.email}
               </p>
@@ -74,6 +101,29 @@ export function AppLayout() {
         <aside
           className={`${collapsed ? 'w-[68px]' : 'w-60'} shrink-0 bg-navy px-2.5 py-4 transition-[width] duration-200 sm:px-3`}
         >
+          {collapsed ? (
+            <div className="mb-3 flex justify-center border-b border-white/10 pb-3">
+              <Avatar url={avatarUrl} initial={initial} className="h-9 w-9 text-sm" />
+            </div>
+          ) : (
+            <div className="mb-4 rounded-xl bg-gradient-to-b from-[#123f80] to-[#0a2452] p-4 text-center shadow-inner">
+              <div className="mx-auto mb-3 h-20 w-20 rounded-full border-2 border-dashed border-white/40 p-1">
+                <Avatar url={avatarUrl} initial={initial} className="h-full w-full text-2xl" />
+              </div>
+              <p className="truncate font-display text-sm font-bold uppercase tracking-wide text-white">
+                {displayName}
+              </p>
+              {user?.email && (
+                <p className="mt-0.5 truncate text-[11px] text-white/45" title={user.email}>
+                  {user.email}
+                </p>
+              )}
+              <div className="mt-4 flex items-center justify-center gap-7 border-t border-white/10 pt-3.5">
+                <StatMini icon={<UsersIcon />} value={counts.alunos} label="Alunos" />
+                <StatMini icon={<CalendarIcon />} value={counts.agendas} label="Agendas" />
+              </div>
+            </div>
+          )}
           <nav className="space-y-1">
             <NavItem to="/dashboard" icon={<GaugeIcon />} label="Dashboard" collapsed={collapsed} />
             <NavItem to="/agenda" icon={<CalendarIcon />} label="Agenda" collapsed={collapsed} />
@@ -87,6 +137,17 @@ export function AppLayout() {
 
         {/* ---------- Conteúdo ---------- */}
         <main className="min-w-0 flex-1 overflow-x-hidden">
+          <div className="border-b border-line bg-surface px-5 py-3 sm:px-8">
+            <p className="text-xs text-ink-faint">
+              Início
+              {crumb && (
+                <>
+                  <span className="mx-1.5">/</span>
+                  <span className="font-semibold text-ink-soft">{crumb}</span>
+                </>
+              )}
+            </p>
+          </div>
           <div className={`mx-auto ${wide ? 'max-w-[1600px]' : 'max-w-6xl'} px-5 py-8 sm:px-8`}>
             <Outlet />
           </div>
@@ -119,14 +180,38 @@ function NavItem({
     >
       {({ isActive }) => (
         <>
-          {isActive && (
-            <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-gradient-to-b from-[#4f7cff] to-[#f43f6e]" />
-          )}
-          <span className={isActive ? 'text-[#7aa2ff]' : ''}>{icon}</span>
+          {isActive && <span className="absolute left-0 top-0 h-full w-1 bg-red" />}
+          <span className={isActive ? 'text-white' : ''}>{icon}</span>
           {!collapsed && <span>{label}</span>}
         </>
       )}
     </NavLink>
+  )
+}
+
+function StatMini({ icon, value, label }: { icon: ReactNode; value: number; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-white/85 [&>svg]:h-6 [&>svg]:w-6">{icon}</span>
+      <div className="text-left leading-none">
+        <p className="font-display text-xl font-bold text-white">{value}</p>
+        <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/50">{label}</p>
+      </div>
+    </div>
+  )
+}
+
+function Avatar({ url, initial, className = '' }: { url: string | null; initial: string; className?: string }) {
+  return (
+    <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ${className}`}>
+      {url ? (
+        <img src={url} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#bf0a30] to-[#0a3161] font-bold text-white">
+          {initial}
+        </span>
+      )}
+    </span>
   )
 }
 

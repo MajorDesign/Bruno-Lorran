@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { Card, Spinner } from '../components/ui'
+import { Card, Spinner, Field, TextInput, BtnSalvar } from '../components/ui'
+import { PhotoUpload } from '../components/PhotoUpload'
+import { useAuth } from '../context/AuthContext'
 
 // Limite do plano Supabase Free = 500 MB de banco.
 // Se você mudar de plano, ajuste este valor.
@@ -41,6 +43,10 @@ export function ConfigPage() {
         <p className="mt-1 text-sm text-ink-soft">Uso do banco de dados e detalhes técnicos da plataforma.</p>
       </header>
 
+      <div className="mb-6">
+        <ProfileCard />
+      </div>
+
       {error && (
         <p className="mb-4 rounded-lg bg-red-soft px-3 py-2 text-sm text-red" role="alert">
           {error}
@@ -49,6 +55,65 @@ export function ConfigPage() {
 
       {loading ? <Spinner /> : stats && <DiskUsage stats={stats} onReload={load} />}
     </div>
+  )
+}
+
+/* ---------- Perfil do administrador (foto + nome) ---------- */
+function ProfileCard() {
+  const { user } = useAuth()
+  const [foto, setFoto] = useState<string | null>(null)
+  const [nome, setNome] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
+  useEffect(() => {
+    const meta = user?.user_metadata ?? {}
+    setFoto((meta.avatar_url as string | undefined) ?? null)
+    setNome((meta.full_name as string | undefined) ?? '')
+  }, [user])
+
+  async function salvar() {
+    setSaving(true)
+    setMsg(null)
+    const { error } = await supabase.auth.updateUser({
+      data: { avatar_url: foto, full_name: nome.trim() || null },
+    })
+    setSaving(false)
+    if (error) setMsg({ type: 'err', text: error.message })
+    else setMsg({ type: 'ok', text: 'Perfil atualizado com sucesso.' })
+  }
+
+  return (
+    <Card className="p-6">
+      <h2 className="font-display text-lg font-semibold text-ink">Meu perfil</h2>
+      <p className="mt-0.5 text-sm text-ink-soft">Sua foto e nome aparecem no menu lateral e no topo.</p>
+
+      <div className="mt-5 flex flex-col gap-6 sm:flex-row sm:items-start">
+        <PhotoUpload value={foto} onChange={setFoto} />
+
+        <div className="flex-1 space-y-4">
+          <Field label="Nome de exibição">
+            <TextInput
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Ex.: Bruno Lorran"
+            />
+          </Field>
+          <Field label="E-mail (login)">
+            <TextInput value={user?.email ?? ''} disabled className="opacity-70" />
+          </Field>
+
+          <div className="flex items-center gap-3">
+            <BtnSalvar onClick={salvar} disabled={saving} label={saving ? 'Salvando…' : 'Salvar'} />
+            {msg && (
+              <span className={`text-sm font-medium ${msg.type === 'ok' ? 'text-assistido' : 'text-red'}`}>
+                {msg.text}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </Card>
   )
 }
 

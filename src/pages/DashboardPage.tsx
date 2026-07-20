@@ -122,7 +122,7 @@ export function DashboardPage() {
           title="Aulas por módulo"
           data={stats.aulasPorModulo}
           empty="Nenhuma aula cadastrada ainda."
-          barClass="bg-[#7c3aed]"
+          barClass="bg-red"
         />
       </div>
     </div>
@@ -145,19 +145,21 @@ function Kpi({
   tone: Tone
   icon: ReactNode
 }) {
-  const tones: Record<Tone, string> = {
-    blue: 'bg-accent-soft text-accent',
-    violet: 'bg-[#ede9fe] text-[#7c3aed]',
-    amber: 'bg-solicitado-bg text-solicitado',
-    green: 'bg-assistido-bg text-assistido',
+  const bg: Record<Tone, string> = {
+    blue: '#0a3161', // azul da bandeira
+    violet: '#bf0a30', // vermelho da bandeira
+    amber: '#b0741a',
+    green: '#1f8a5b',
   }
   return (
-    <Card className="p-5">
-      <div className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${tones[tone]}`}>{icon}</div>
-      <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-ink-faint">{label}</p>
-      <p className="mt-1 font-display text-4xl font-semibold leading-none text-ink">{value}</p>
-      <p className="mt-1.5 text-xs text-ink-soft">{hint}</p>
-    </Card>
+    <div className="relative overflow-hidden rounded-md text-white shadow-sm" style={{ backgroundColor: bg[tone] }}>
+      <div className="p-4">
+        <p className="font-display text-4xl font-bold leading-none">{value}</p>
+        <p className="mt-1 text-sm font-semibold">{label}</p>
+      </div>
+      <div className="pointer-events-none absolute right-1 top-2 opacity-25 [&>svg]:h-16 [&>svg]:w-16">{icon}</div>
+      <div className="bg-black/10 px-4 py-1.5 text-[11px]">{hint}</div>
+    </div>
   )
 }
 

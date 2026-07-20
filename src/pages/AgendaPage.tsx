@@ -155,7 +155,7 @@ export function AgendaPage() {
       <div className="mb-4 grid grid-cols-3 gap-3">
         <SummaryPill label="Aulas pendentes" value={counts.pendente} color="#eab308" />
         <SummaryPill label="Aulas realizadas" value={counts.realizada} color="#1f8a5b" />
-        <SummaryPill label="Aulas canceladas" value={counts.cancelada} color="#e11d48" />
+        <SummaryPill label="Aulas canceladas" value={counts.cancelada} color="#bf0a30" />
       </div>
 
       {error && (
@@ -223,12 +223,9 @@ const seg = (active: boolean) =>
 
 function SummaryPill({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3">
-      <div className="flex items-center gap-2">
-        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-        <span className="text-sm font-medium text-ink-soft">{label}</span>
-      </div>
-      <span className="font-display text-xl font-semibold text-ink">{value}</span>
+    <div className="rounded-md px-4 py-3 text-white shadow-sm" style={{ backgroundColor: color }}>
+      <p className="font-display text-2xl font-bold leading-none">{value}</p>
+      <p className="mt-1 text-sm font-semibold">{label}</p>
     </div>
   )
 }
