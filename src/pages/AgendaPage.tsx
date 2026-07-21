@@ -29,6 +29,15 @@ export function AgendaPage() {
   const [editing, setEditing] = useState<EventRow | 'novo' | null>(null)
   const [novoDia, setNovoDia] = useState<Date | null>(null)
   const [statuses, setStatuses] = useState<(EventStatus | null)[]>([])
+  const dragRef = useRef<EventRow | null>(null)
+  const [reschedule, setReschedule] = useState<{ event: EventRow; day: Date } | null>(null)
+
+  // Solta o card num dia: abre o pop-up de remarcação para aquela data.
+  function handleDropDay(day: Date) {
+    const ev = dragRef.current
+    dragRef.current = null
+    if (ev) setReschedule({ event: ev, day })
+  }
 
   const range = useMemo(() => (view === 'semana' ? weekRange(ref) : monthRange(ref)), [view, ref])
 
@@ -193,6 +202,8 @@ export function AgendaPage() {
               showFree={showFree}
               onOpen={setEditing}
               onAdd={() => novoNoDia(day)}
+              onDragStartEvent={(ev) => (dragRef.current = ev)}
+              onDropDay={handleDropDay}
             />
           ))}
         </div>
@@ -211,6 +222,18 @@ export function AgendaPage() {
             setEditing(null)
             loadEvents()
             loadCounts()
+          }}
+        />
+      )}
+
+      {reschedule && (
+        <RescheduleModal
+          event={reschedule.event}
+          day={reschedule.day}
+          onClose={() => setReschedule(null)}
+          onSaved={() => {
+            setReschedule(null)
+            loadEvents()
           }}
         />
       )}
@@ -237,17 +260,34 @@ function DayColumn({
   showFree,
   onOpen,
   onAdd,
+  onDragStartEvent,
+  onDropDay,
 }: {
   day: Date
   events: EventRow[]
   showFree: boolean
   onOpen: (e: EventRow) => void
   onAdd: () => void
+  onDragStartEvent: (e: EventRow) => void
+  onDropDay: (day: Date) => void
 }) {
   const isToday = sameDay(day, new Date())
   const free = showFree ? computeFree(day, events) : []
+  const [over, setOver] = useState(false)
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-surface">
+    <div
+      onDragOver={(e) => {
+        e.preventDefault()
+        if (!showFree) setOver(true)
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault()
+        setOver(false)
+        if (!showFree) onDropDay(day)
+      }}
+      className={`overflow-hidden rounded-xl border bg-surface ${over ? 'border-accent ring-2 ring-accent/40' : 'border-line'}`}
+    >
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">{DIAS[day.getDay()]}</span>
@@ -281,18 +321,25 @@ function DayColumn({
         ) : events.length === 0 ? (
           <p className="px-1 py-2 text-xs text-ink-faint">—</p>
         ) : (
-          events.map((e) => <EventChip key={e.id} e={e} onOpen={onOpen} />)
+          events.map((e) => <EventChip key={e.id} e={e} onOpen={onOpen} onDragStart={onDragStartEvent} />)
         )}
       </div>
     </div>
   )
 }
 
-function EventChip({ e, onOpen }: { e: EventRow; onOpen: (e: EventRow) => void }) {
+function EventChip({ e, onOpen, onDragStart }: { e: EventRow; onOpen: (e: EventRow) => void; onDragStart: (e: EventRow) => void }) {
   return (
     <button
+      draggable
+      onDragStart={(ev) => {
+        ev.dataTransfer.effectAllowed = 'move'
+        ev.dataTransfer.setData('text/plain', e.id)
+        onDragStart(e)
+      }}
       onClick={() => onOpen(e)}
-      className="flex w-full items-center gap-2 rounded-md border border-line bg-surface px-2 py-2 shadow-sm hover:bg-paper"
+      title="Arraste para outro dia para remarcar"
+      className="flex w-full cursor-grab items-center gap-2 rounded-md border border-line bg-surface px-2 py-2 shadow-sm hover:bg-paper active:cursor-grabbing"
       style={{ borderLeft: `4px solid ${e.cor || BAR}` }}
     >
       <EventAvatar src={e.student?.foto_url ?? null} nome={e.titulo} status={e.status} isGroup={!!e.group_id} />
@@ -632,6 +679,78 @@ function EventModal({
       </div>
     </div>
   )
+}
+
+/* ---------- Modal de remarcação (arrastar card) ---------- */
+function RescheduleModal({
+  event,
+  day,
+  onClose,
+  onSaved,
+}: {
+  event: EventRow
+  day: Date
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const durationMs = new Date(event.end_at).getTime() - new Date(event.start_at).getTime()
+  const [hora, setHora] = useState(hhmmFromIso(event.start_at))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function salvar() {
+    if (!hora) return setError('Informe o novo horário.')
+    setSaving(true)
+    setError(null)
+    const [h, m] = hora.split(':').map(Number)
+    const start = new Date(day)
+    start.setHours(h || 0, m || 0, 0, 0)
+    const end = new Date(start.getTime() + durationMs)
+    const { error: err } = await supabase
+      .from('events')
+      .update({ start_at: start.toISOString(), end_at: end.toISOString() })
+      .eq('id', event.id)
+    setSaving(false)
+    if (err) return setError(err.message)
+    onSaved()
+  }
+
+  const quem = event.group?.nome ?? event.student?.nome ?? event.titulo
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-line px-6 py-4">
+          <h2 className="font-display text-lg font-semibold text-ink">Remarcar aula</h2>
+          <p className="mt-0.5 text-sm text-ink-soft">Remarcação avulsa — vale só para esta data, não afeta as próximas semanas.</p>
+        </div>
+        <div className="space-y-4 px-6 py-5">
+          {error && <p className="rounded-lg bg-red-soft px-3 py-2 text-sm text-red">{error}</p>}
+          <div className="rounded-lg border border-line bg-paper px-3 py-2 text-sm">
+            <p className="font-semibold text-ink">{quem}</p>
+            <p className="mt-0.5 text-ink-soft">
+              Nova data:{' '}
+              <span className="font-medium text-ink">
+                {day.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+              </span>
+            </p>
+          </div>
+          <Field label="Para qual horário deseja remanejar?">
+            <TextInput type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+          </Field>
+          <p className="text-xs text-ink-faint">Duração mantida: {Math.round(durationMs / 60000)} min.</p>
+        </div>
+        <div className="flex items-center justify-between border-t border-line px-6 py-4">
+          <BtnCancelar onClick={onClose} disabled={saving} />
+          <BtnSalvar onClick={salvar} disabled={saving} label={saving ? 'Salvando…' : 'Remarcar'} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function hhmmFromIso(iso: string) {
+  const d = new Date(iso)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 /* ---------- Horários livres ---------- */
