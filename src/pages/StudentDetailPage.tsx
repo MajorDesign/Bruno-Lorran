@@ -243,7 +243,6 @@ export function StudentDetailPage() {
               <dl className="mt-3 space-y-1.5 text-sm">
                 <InfoRow label="E-mail" value={student.email} />
                 <InfoRow label="Telefone" value={student.telefone} />
-                <InfoRow label="CPF" value={student.cpf} />
                 <InfoRow label="Nascimento" value={fmtNasc(student.nascimento)} />
                 <InfoRow label="Observações" value={student.observacoes} />
               </dl>

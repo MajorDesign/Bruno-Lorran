@@ -39,13 +39,16 @@ interface EventLike {
   end_at: string
   student_id: string | null
   group_id: string | null
+  status?: string | null
 }
 
 // Monta a ocupação da agenda (por dia da semana, em minutos), ignorando os
-// eventos do próprio aluno/grupo que está sendo editado (serão substituídos).
+// eventos do próprio aluno/grupo que está sendo editado (serão substituídos)
+// e as aulas canceladas (o horário volta a ficar livre).
 export function buildOccupancy(events: EventLike[], exclude: { studentId?: string; groupId?: string }): Occupancy {
   const occ: Occupancy = {}
   for (const e of events) {
+    if (e.status === 'cancelada') continue
     if (exclude.studentId && e.student_id === exclude.studentId) continue
     if (exclude.groupId && e.group_id === exclude.groupId) continue
     const s = new Date(e.start_at)
@@ -74,9 +77,11 @@ export function availableTimes(weekday: number, duration: number, occupancy: Occ
 // Primeiro conflito entre as ocorrências geradas e os eventos existentes.
 export function firstConflict(
   occ: { start: Date; end: Date }[],
-  existing: { start_at: string; end_at: string; titulo: string }[],
+  existing: { start_at: string; end_at: string; titulo: string; status?: string | null }[],
 ): { titulo: string; start: Date } | null {
-  const ex = existing.map((e) => ({ s: new Date(e.start_at).getTime(), en: new Date(e.end_at).getTime(), titulo: e.titulo }))
+  const ex = existing
+    .filter((e) => e.status !== 'cancelada')
+    .map((e) => ({ s: new Date(e.start_at).getTime(), en: new Date(e.end_at).getTime(), titulo: e.titulo }))
   for (const o of occ) {
     const os = o.start.getTime()
     const oe = o.end.getTime()

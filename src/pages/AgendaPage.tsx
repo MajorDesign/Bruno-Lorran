@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { CORES_EVENTO, type AgendaEvent, type EventStatus, type Group, type Student } from '../lib/types'
@@ -142,7 +142,7 @@ export function AgendaPage() {
             {showFree ? 'Ver aulas' : 'Ver horários vagos'}
           </button>
           <BtnNovo
-            label="Novo item"
+            label="Nova aula"
             onClick={() => {
               setNovoDia(null)
               setEditing('novo')
@@ -432,6 +432,18 @@ function EventModal({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [groupMembers, setGroupMembers] = useState<{ id: string; nome: string; foto_url: string | null }[]>([])
+  const autoTitle = useRef('')
+
+  // Ao escolher aluno/grupo, sugere o título "Aula de <nome>" (sem sobrescrever
+  // um título que o professor já digitou manualmente).
+  function handleVinculo(v: string) {
+    setVinculo(v)
+    let sugestao = ''
+    if (v.startsWith('s:')) sugestao = `Aula de ${students.find((s) => s.id === v.slice(2))?.nome ?? ''}`.trim()
+    else if (v.startsWith('g:')) sugestao = `Aula do grupo ${groups.find((g) => g.id === v.slice(2))?.nome ?? ''}`.trim()
+    if (sugestao && (!titulo.trim() || titulo === autoTitle.current)) setTitulo(sugestao)
+    autoTitle.current = sugestao
+  }
 
   useEffect(() => {
     if (!event?.group_id) {
@@ -536,8 +548,8 @@ function EventModal({
             </Field>
           </div>
 
-          <Field label="Aluno / Grupo (opcional)">
-            <Select value={vinculo} onChange={(e) => setVinculo(e.target.value)}>
+          <Field label="Aluno / Grupo">
+            <Select value={vinculo} onChange={(e) => handleVinculo(e.target.value)}>
               <option value="">Sem vínculo</option>
               <optgroup label="Alunos">
                 {students.map((s) => (
@@ -630,6 +642,7 @@ function computeFree(day: Date, events: EventRow[]): [Date, Date][] {
   wEnd.setHours(WORK_END, 0, 0, 0)
 
   const busy = events
+    .filter((e) => e.status !== 'cancelada')
     .map((e) => [new Date(e.start_at), new Date(e.end_at)] as [Date, Date])
     .filter(([s, e]) => e > wStart && s < wEnd)
     .map(([s, e]) => [s < wStart ? wStart : s, e > wEnd ? wEnd : e] as [Date, Date])

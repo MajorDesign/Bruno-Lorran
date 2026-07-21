@@ -22,7 +22,6 @@ export function StudentFormPage() {
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [telefone, setTelefone] = useState('')
-  const [cpf, setCpf] = useState('')
   const [nascimento, setNascimento] = useState('')
   const [observacoes, setObservacoes] = useState('')
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
@@ -54,7 +53,6 @@ export function StudentFormPage() {
         setNome(s.nome)
         setEmail(s.email ?? '')
         setTelefone(s.telefone ?? '')
-        setCpf(s.cpf ?? '')
         setNascimento(s.nascimento ?? '')
         setObservacoes(s.observacoes ?? '')
         setFotoUrl(s.foto_url)
@@ -73,11 +71,12 @@ export function StudentFormPage() {
       }
 
       // Todos os eventos: ocupação da agenda + resumo do aluno
-      const allEv = ((await supabase.from('events').select('start_at, end_at, student_id, group_id')).data ?? []) as {
+      const allEv = ((await supabase.from('events').select('start_at, end_at, student_id, group_id, status')).data ?? []) as {
         start_at: string
         end_at: string
         student_id: string | null
         group_id: string | null
+        status: string | null
       }[]
 
       setOccupancy(buildOccupancy(allEv, { studentId: isEdit ? editId : undefined }))
@@ -145,11 +144,11 @@ export function StudentFormPage() {
       const rangeEnd = occ[occ.length - 1].end
       const { data: existRaw, error: eEx } = await supabase
         .from('events')
-        .select('start_at, end_at, titulo, student_id')
+        .select('start_at, end_at, titulo, student_id, status')
         .lt('start_at', rangeEnd.toISOString())
         .gt('end_at', rangeStart.toISOString())
       if (eEx) return fail(eEx.message)
-      const existing = ((existRaw ?? []) as { start_at: string; end_at: string; titulo: string; student_id: string | null }[]).filter(
+      const existing = ((existRaw ?? []) as { start_at: string; end_at: string; titulo: string; student_id: string | null; status: string | null }[]).filter(
         (e) => !(isEdit && e.student_id === editId), // no editar, as do próprio aluno serão substituídas
       )
       const conflito = firstConflict(occ, existing)
@@ -163,7 +162,6 @@ export function StudentFormPage() {
       nome: nome.trim(),
       email: email.trim() || null,
       telefone: telefone.trim() || null,
-      cpf: cpf.trim() || null,
       nascimento: nascimento || null,
       observacoes: observacoes.trim() || null,
       foto_url: fotoUrl,
@@ -247,9 +245,6 @@ export function StudentFormPage() {
             </Field>
             <Field label="Telefone">
               <TextInput value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(00) 00000-0000" />
-            </Field>
-            <Field label="CPF">
-              <TextInput value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" />
             </Field>
             <Field label="Data de nascimento">
               <TextInput type="date" value={nascimento} onChange={(e) => setNascimento(e.target.value)} />

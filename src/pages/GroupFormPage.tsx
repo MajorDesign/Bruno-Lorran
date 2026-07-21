@@ -46,11 +46,12 @@ export function GroupFormPage() {
         setInitialMembers(new Set(ids))
       }
 
-      const allEv = ((await supabase.from('events').select('start_at, end_at, student_id, group_id')).data ?? []) as {
+      const allEv = ((await supabase.from('events').select('start_at, end_at, student_id, group_id, status')).data ?? []) as {
         start_at: string
         end_at: string
         student_id: string | null
         group_id: string | null
+        status: string | null
       }[]
       setOccupancy(buildOccupancy(allEv, { groupId: isEdit ? editId : undefined }))
 
@@ -112,11 +113,11 @@ export function GroupFormPage() {
       const rangeEnd = occ[occ.length - 1].end
       const { data: existRaw, error: eEx } = await supabase
         .from('events')
-        .select('start_at, end_at, titulo, group_id')
+        .select('start_at, end_at, titulo, group_id, status')
         .lt('start_at', rangeEnd.toISOString())
         .gt('end_at', rangeStart.toISOString())
       if (eEx) return fail(eEx.message)
-      const existing = ((existRaw ?? []) as { start_at: string; end_at: string; titulo: string; group_id: string | null }[]).filter(
+      const existing = ((existRaw ?? []) as { start_at: string; end_at: string; titulo: string; group_id: string | null; status: string | null }[]).filter(
         (e) => !(isEdit && e.group_id === editId),
       )
       const conflito = firstConflict(occ, existing)
