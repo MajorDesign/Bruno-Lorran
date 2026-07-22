@@ -54,6 +54,10 @@ export function StudentsPage() {
 
   async function handleDeleteStudent(s: Student) {
     if (!confirm(`Excluir o aluno "${s.nome}"? Isso remove vínculos, aulas e agendamentos dele.`)) return
+    // Remove as aulas individuais dele na agenda e o vínculo em grupos antes de excluir.
+    const evDel = await supabase.from('events').delete().eq('student_id', s.id)
+    if (evDel.error) return setError(evDel.error.message)
+    await supabase.from('group_members').delete().eq('student_id', s.id)
     const { error } = await supabase.from('students').delete().eq('id', s.id)
     if (error) return setError(error.message)
     load()
